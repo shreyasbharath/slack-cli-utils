@@ -19,19 +19,19 @@ The interactive mode will guide you through:
 ## Quick Decision Guide
 
 - **New to this tool?** → Use `python slack.py` (interactive mode)
-- **For Bookmarked Messages** → `python slack.py bookmarks`
-- **For Direct Messages (DMs)** → `python slack.py dm`
-- **For Channels or Complex Searches** → `python slack.py channel` or `python slack.py search`
-- **To Find Channel IDs** → `python slack.py list`
+- **For Bookmarked Messages** → `python bookmarks.py` or `python slack.py bookmarks`
+- **For Direct Messages (DMs)** → `python history.py` or `python slack.py dm`
+- **For Channels or Complex Searches** → `python search.py` or `python slack.py search`
+- **To Find Channel IDs** → `python list.py` or `python slack.py list`
 
 ## Features
 
 - 🎯 **Unified Interface**: Single command for all export operations
 - 📥 **Multiple Export Types**: DMs, channels, bookmarks, search results
 - 🔄 **Interactive & CLI Modes**: Choose your preferred workflow
-- 📊 **Real-time Progress**: Track export progress (X/Y messages)
+- 📊 **Real-time Progress**: Track export progress with beautiful progress bars
 - 💾 **Multiple Formats**: Markdown, JSON, JSONL output
-- 🔄 **Smart Rate Limiting**: Automatic backoff and retry
+- 🔄 **Smart Rate Limiting**: Automatic backoff and retry with exponential backoff
 - 📝 **Rich Context**: Channel names, user names, timestamps, reactions
 - ⚡ **Optimized Performance**: Streaming writes, concurrent processing
 
@@ -48,39 +48,10 @@ The interactive mode will guide you through:
    cd /Users/shreyas/Downloads/slack
    ```
 
-2. **Create a virtual environment (recommended):**
+2. Install dependencies:
    ```bash
-   # Create virtual environment
-   python3 -m venv slack-export-env
-   
-   # Activate virtual environment
-   # On macOS/Linux:
-   source slack-export-env/bin/activate
-   
-   # On Windows:
-   # slack-export-env\Scripts\activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   # Option 1: Install from requirements file (recommended)
-   pip install -r requirements.txt
-   
-   # Option 2: Install manually
    pip install requests
    ```
-
-4. **Verify installation:**
-   ```bash
-   python slack.py --help
-   ```
-
-### Virtual Environment Notes
-
-- **Why use a virtual environment?** Keeps dependencies isolated from your system Python
-- **Activation required:** Run `source slack-export-env/bin/activate` each time you use the tool
-- **Deactivation:** Run `deactivate` when finished
-- **Requirements file:** All dependencies are listed in the single `requests` library
 
 ## Getting Your Slack Token
 
@@ -123,48 +94,48 @@ python slack.py
 #### Export Bookmarks
 ```bash
 # Basic bookmarks export
-python slack.py bookmarks -t "xoxp-your-token" -o my_bookmarks.md
+python bookmarks.py -t "xoxp-your-token" -o my_bookmarks.md
 
 # JSON format
-python slack.py bookmarks -t "xoxp-your-token" -o bookmarks.json
+python bookmarks.py -t "xoxp-your-token" -o bookmarks.json
 
-# Custom page size
-python slack.py bookmarks -t "xoxp-your-token" --page-size 50 -o bookmarks.md
+# Via unified CLI
+python slack.py bookmarks -t "xoxp-your-token" -o bookmarks.md
 ```
 
 #### Export DM Conversation
 ```bash
 # Export DM from 2024
-python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM --since 2024-01-01
+python history.py -t "xoxp-your-token" -c D0889Q50GPM --since 2024-01-01
 
-# Recent messages only (default: 2025-01-01)
-python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM -o conversation.md
+# Via unified CLI
+python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM -s 2024-01-01
 ```
 
 #### Export Channel Messages
 ```bash
 # Export channel with complete history
-python slack.py channel -t "xoxp-your-token" -q "in:#general" --monthly-chunks
+python search.py -t "xoxp-your-token" -q "in:#general" --monthly-chunks
 
-# Export recent channel messages
-python slack.py channel -t "xoxp-your-token" -q "in:#engineering" -m 500
+# Via unified CLI
+python slack.py search -t "xoxp-your-token" -q "in:#general" --monthly-chunks
 ```
 
 #### Search Messages
 ```bash
 # Messages from specific user
-python slack.py search -t "xoxp-your-token" -q "from:@username" -o user_messages.md
+python search.py -t "xoxp-your-token" -q "from:@username" -o user_messages.md
 
-# Messages with attachments
-python slack.py search -t "xoxp-your-token" -q "has:attachment" --monthly-chunks
-
-# Complex search
-python slack.py search -t "xoxp-your-token" -q "in:#general project after:2024-01-01"
+# Via unified CLI
+python slack.py search -t "xoxp-your-token" -q "from:@username"
 ```
 
 #### List Channels and DMs
 ```bash
 # Show all available channels and DMs with IDs
+python list.py -t "xoxp-your-token"
+
+# Via unified CLI
 python slack.py list -t "xoxp-your-token"
 ```
 
@@ -206,168 +177,40 @@ Human-readable format with rich formatting, perfect for documentation and review
 ### JSON Format  
 Structured data format for programmatic processing:
 ```bash
-python slack.py bookmarks -t "token" -o data.json
+python bookmarks.py -t "token" -o data.json
 ```
 
 ### JSONL Format
 One JSON object per line, ideal for streaming processing:
 ```bash
-python slack.py search -t "token" -q "query" -o results.jsonl
-```
-
-## Advanced Usage
-
-### Monthly Chunks for Complete History
-For channels with extensive history, use monthly chunks to overcome API limitations:
-```bash
-python slack.py channel -t "token" -q "in:#general" --monthly-chunks
-```
-
-### Custom Date Ranges
-```bash
-# DMs from specific period
-python slack.py dm -t "token" -c CHANNEL_ID --since 2023-06-01
-
-# Search with date bounds
-python slack.py search -t "token" -q "project after:2024-01-01 before:2024-06-30"
+python search.py -t "token" -q "query" -o results.jsonl
 ```
 
 ## Project Structure
 
 ```
 slack/
-├── slack.py                    # 🎯 Main unified CLI (START HERE)
-├── fetch_bookmarks.py          # Bookmarks/starred messages fetcher
-├── fetch_dm_history.py         # Direct message history fetcher  
-├── fetch_channel_search.py     # Search-based channel/message fetcher
-├── list_conversations.py       # Channel and DM discovery tool
-├── extract_messages.py         # Message extraction from exports
-├── requirements.txt            # Python dependencies
+├── slack.py                    # 🎯 Main unified entry point (START HERE)
+├── cli.py                      # Unified CLI implementation
+├── bookmarks.py                # Bookmarks/starred messages fetcher
+├── history.py                  # Direct message history fetcher  
+├── search.py                   # Search-based channel/message fetcher
+├── list.py                     # Channel and DM discovery tool
+├── extract.py                  # Message extraction from exports
+├── utils.py                    # Standardized utilities (logging, rate limiting)
+├── test.py                     # Test utilities and demonstrations
 └── README.md                   # This documentation
 ```
 
-### When to Use Each Tool Directly
+### Individual Tools
 
-Most users should use `python slack.py`, but you can call the specialized tools directly:
+While `python slack.py` is recommended, you can call the specialized tools directly:
 
-- **`fetch_bookmarks.py`**: When you only need bookmarks and want fine control
-- **`fetch_dm_history.py`**: For DM exports with specific date ranges
-- **`fetch_channel_search.py`**: For complex search queries and channel exports
-- **`list_conversations.py`**: When you need to discover channel IDs
-
-## Detailed Tool Documentation
-
-### 1. Bookmarks Export (`fetch_bookmarks.py`)
-
-Fetches all your starred/bookmarked messages across all channels with rich context.
-
-#### Command Options
-- `-t, --token` (required): Your Slack User OAuth Token
-- `-o, --output`: Output file path (default: timestamped)
-- `--page-size`: Number of bookmarks per API call (default: 100)
-
-#### Example Output Format
-```markdown
-# Slack Bookmarked Messages
-
-**Export date:** 2025-08-04 14:30:00
-**Total bookmarks:** 47
-
----
-
-## Bookmark 1
-
-**Bookmarked:** 2025-07-10T14:30:45
-**Message Date:** 2025-07-08T09:15:22
-**Channel:** #engineering (C1234567890)
-**User:** shreyas.balakrishna (U0987654321)
-**Permalink:** https://playhq.slack.com/archives/C1234567890/p1720425322123456
-
-**Message:**
-
-Here's the architecture diagram for the new feature. Note the database schema changes needed.
-
-**Attachments:** 1 attachment(s)
-- Architecture Diagram: https://files.slack.com/files-pri/...
-
-**Reactions:**
-- :eyes: (3)
-- :thumbsup: (5)
-
----
-```
-
-### 2. DM History Export (`fetch_dm_history.py`)
-
-Fetches complete conversation history from Direct Messages with progress tracking.
-
-#### Command Options
-- `-t, --token` (required): Your Slack User OAuth Token
-- `-c, --channel` (required): The DM channel ID
-- `-s, --since`: Start date in YYYY-MM-DD format (default: 2025-01-01)
-- `-o, --output`: Output file path (default: auto-generated with timestamp)
-
-#### Finding DM Channel IDs
-```bash
-# First, list all conversations to find the DM channel ID
-python slack.py list -t "xoxp-your-token"
-
-# Look for entries like:
-# Direct Message Channels (82):
-#   ID: D0889Q50GPM - User: U07C33KQM5Z
-```
-
-### 3. Channel & Search Export (`fetch_channel_search.py`)
-
-Powerful search-based fetcher using Slack's search API for channels and complex queries.
-
-#### Command Options
-- `-t, --token` (required): Slack User OAuth Token
-- `-q, --query` (required): Slack search query
-- `-m, --max-results`: Maximum number of results (default: 100)
-- `--page-size`: Results per API call (default: 20, max: 100)
-- `-o, --output`: Output file (.md, .json, or .jsonl)
-- `--monthly-chunks`: Break search into monthly chunks for complete history
-- `--start-date`: Start date for monthly chunks (default: 2 years ago)
-- `--end-date`: End date for monthly chunks (default: today)
-
-#### Advanced Search Examples
-```bash
-# Complete user message history with monthly chunks
-python fetch_channel_search.py -t "token" -q "from:@username" --monthly-chunks
-
-# Channel archive with attachments only
-python fetch_channel_search.py -t "token" -q "in:#project has:attachment" -m 1000
-
-# Recent discussions about specific topic
-python fetch_channel_search.py -t "token" -q "deployment after:2024-07-01" -o recent_deploys.md
-```
-
-### 4. Channel Discovery (`list_conversations.py`)
-
-Lists all accessible channels, DMs, and groups with their IDs for use in other tools.
-
-#### Usage
-```bash
-python list_conversations.py "xoxp-your-token"
-```
-
-#### Example Output
-```
-Public Channels (45):
-  ID: C1234567890 - Name: general (👥 1,234 members)
-  ID: C0987654321 - Name: engineering (👥 67 members)
-
-Private Channels (12):
-  ID: G1111111111 - Name: leadership-team (👥 8 members)
-
-Direct Message Channels (82):
-  ID: D0889Q50GPM - User: U07C33KQM5Z
-  ID: D0123456789 - User: U08D44LMN2P
-
-Group DMs (5):
-  ID: G2222222222 - Members: 4
-```
+- **`bookmarks.py`**: Export starred/bookmarked messages
+- **`history.py`**: Export DM conversation history
+- **`search.py`**: Complex search queries and channel exports  
+- **`list.py`**: Discover channel IDs and available conversations
+- **`extract.py`**: Extract messages from existing exports
 
 ## Example Workflows
 
@@ -386,29 +229,44 @@ python slack.py dm -t "your-token" -c CHANNEL_ID
 ### 2. Project Documentation
 ```bash
 # Export all messages from project channel
-python slack.py channel -t "token" -q "in:#project-alpha" --monthly-chunks
+python search.py -t "token" -q "in:#project-alpha" --monthly-chunks
 
 # Export all your messages about the project
-python slack.py search -t "token" -q "from:me project-alpha" -o my_project_posts.md
+python search.py -t "token" -q "from:me project-alpha" -o my_project_posts.md
 ```
 
 ### 3. User Activity Analysis
 ```bash
 # Export all messages from a user
-python slack.py search -t "token" -q "from:@username" --monthly-chunks
+python search.py -t "token" -q "from:@username" --monthly-chunks
 
 # Export messages with attachments from user
-python slack.py search -t "token" -q "from:@username has:attachment"
+python search.py -t "token" -q "from:@username has:attachment"
 ```
 
-### 4. Team Retrospective
-```bash
-# Export team channel for sprint retrospective
-python slack.py channel -t "token" -q "in:#team-falcon during:2024-07"
+## Standardized Features
 
-# Export decision-making discussions
-python slack.py search -t "token" -q "in:#architecture decision after:2024-06-01"
-```
+All tools now share:
+
+### 🎨 **Consistent Logging**
+- **Phase indicators**: `📋 Phase 1: Starting operations`
+- **Progress bars**: `📊 Progress: 45/100 (45.0%) |█████████░░░░░░░░░░░| ETA: 2s`
+- **Status messages**: `✅ Success`, `⚠️ Warning`, `❌ Error`, `ℹ️ Info`
+- **API calls**: `🔄 API: conversations.history page 1 (200 items)`
+- **Completion**: `🎉 Complete! Processed 1,247 items in 12.3s (101.4 items/sec)`
+
+### 🔄 **Smart Rate Limiting**
+- **Exponential backoff**: 1s → 2s → 4s → 8s → 16s...
+- **Rate limit detection**: Automatic handling of 429 responses
+- **Proactive throttling**: Respects `X-Rate-Limit-Remaining` headers
+- **Safety buffers**: 10% extra wait time on Slack's retry-after suggestions
+
+### 🛠 **Professional Features**
+- **Consistent error handling** with helpful scope guidance
+- **Real-time progress tracking** with ETA calculations
+- **Graceful interruption** handling (Ctrl+C)
+- **Memory-efficient streaming** for large exports
+- **Multiple output formats** (Markdown, JSON, JSONL)
 
 ## Troubleshooting
 
@@ -416,7 +274,7 @@ python slack.py search -t "token" -q "in:#architecture decision after:2024-06-01
 
 #### "No data found"
 - **Bookmarks**: Check that you have starred messages in Slack
-- **DMs**: Verify the channel ID using `python slack.py list`
+- **DMs**: Verify the channel ID using `python list.py`
 - **Channels**: Ensure you have access to the channel
 - **Search**: Try a broader search query
 
@@ -442,7 +300,7 @@ All tools handle rate limits automatically:
 ### Getting Help
 
 1. **Interactive Mode**: Use `python slack.py` for guided setup
-2. **List First**: Run `python slack.py list` to see available channels
+2. **List First**: Run `python list.py` to see available channels
 3. **Start Small**: Try exporting bookmarks first to test your token
 4. **Check Scopes**: Ensure your token has required permissions
 
@@ -454,27 +312,6 @@ All tools handle rate limits automatically:
 4. **Monthly Chunks**: Use for complete channel history (overcomes search limits)
 5. **Multiple Formats**: Export to JSON for further processing, Markdown for reading
 
-## Performance Notes
-
-- **Bookmarks**: Fast fetching, enrichment adds ~0.1s per bookmark for context
-- **DMs**: Streaming writes prevent data loss, ~100-500 messages/minute
-- **Channels**: Monthly chunks bypass 10K message search limit
-- **Large Exports**: Consider running overnight for years of history
-
-## Data Privacy & Security
-
-- All data stays local - nothing sent to external services
-- Tokens are only used for Slack API calls
-- Generated files contain your actual Slack data
-- Ensure compliance with your organization's data policies
-- Consider using `.gitignore` for exported files in repositories
-
 ## License
 
 This tool is for personal use. Ensure you comply with your organization's Slack data retention and privacy policies.
-
----
-
-**Version**: 2.0  
-**Last Updated**: August 2025  
-**Author**: For personal Slack data management

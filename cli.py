@@ -19,11 +19,11 @@ class SlackCLI:
         
         # Map operations to their corresponding scripts
         self.operations = {
-            'bookmarks': 'slack_bookmarks_fetcher.py',
-            'dm': 'fetch_dm_history.py', 
-            'channel': 'slack_posts_fetcher.py',
-            'search': 'slack_posts_fetcher.py',
-            'list': 'list_conversations.py'
+            'bookmarks': 'bookmarks.py',
+            'dm': 'history.py', 
+            'channel': 'search.py',
+            'search': 'search.py',
+            'list': 'list.py'
         }
     
     def show_interactive_menu(self) -> str:
