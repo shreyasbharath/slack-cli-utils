@@ -19,7 +19,7 @@ class SlackCLI:
         
         # Map operations to their corresponding scripts
         self.operations = {
-            'bookmarks': 'bookmarks.py',
+            'later': 'later.py',
             'dm': 'history.py', 
             'channel': 'search.py',
             'search': 'search.py',
@@ -32,8 +32,8 @@ class SlackCLI:
         print("=" * 50)
         print("What would you like to export?")
         print()
-        print("1. 📌 Bookmarked/Starred Messages")
-        print("   Export all messages you've starred across all channels")
+        print("1. 📌 Saved Messages (Later)")
+        print("   Export all messages you've saved for later across all channels")
         print()
         print("2. 💬 Direct Messages (DMs)")
         print("   Export conversation history from a specific DM")
@@ -54,7 +54,7 @@ class SlackCLI:
             try:
                 choice = input("Enter your choice (1-6): ").strip()
                 if choice == '1':
-                    return 'bookmarks'
+                    return 'later'
                 elif choice == '2':
                     return 'dm'
                 elif choice == '3':
@@ -101,9 +101,9 @@ class SlackCLI:
         
         return filename
     
-    def run_bookmarks(self, args) -> int:
-        """Run bookmarks export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'slack_bookmarks_fetcher.py')]
+    def run_later(self, args) -> int:
+        """Run saved messages (later) export."""
+        cmd = ['python3', os.path.join(self.script_dir, 'later.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
@@ -132,7 +132,7 @@ class SlackCLI:
     
     def run_dm(self, args) -> int:
         """Run DM export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'fetch_dm_history.py')]
+        cmd = ['python3', os.path.join(self.script_dir, 'history.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
@@ -171,7 +171,7 @@ class SlackCLI:
     
     def run_channel(self, args) -> int:
         """Run channel export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'fetch_channel_search.py')]
+        cmd = ['python3', os.path.join(self.script_dir, 'search.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
@@ -222,7 +222,7 @@ class SlackCLI:
     
     def run_search(self, args) -> int:
         """Run search export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'fetch_channel_search.py')]
+        cmd = ['python3', os.path.join(self.script_dir, 'search.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
@@ -275,16 +275,16 @@ class SlackCLI:
     
     def run_list(self, args) -> int:
         """Run channel/DM listing."""
-        cmd = ['python3', os.path.join(self.script_dir, 'list_conversations.py')]
+        cmd = ['python3', os.path.join(self.script_dir, 'list.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
-            cmd.append(token)
+            cmd.extend(['-t', token])
         else:
             if not args.token:
                 print("❌ Error: --token is required for listing")
                 return 1
-            cmd.append(args.token)
+            cmd.extend(['-t', args.token])
         
         print(f"\n🚀 Running: {' '.join(cmd[2:])}")
         return subprocess.run(cmd).returncode
@@ -300,8 +300,8 @@ Examples:
   # Interactive mode (recommended)
   python slack.py
 
-  # Export bookmarks directly
-  python slack.py bookmarks -t "xoxp-token" -o bookmarks.md
+  # Export saved messages directly
+  python slack.py later -t "xoxp-token" -o saved_messages.md
 
   # Export DM conversation  
   python slack.py dm -t "xoxp-token" -c D0889Q50GPM --since 2024-01-01
@@ -321,7 +321,7 @@ Interactive mode will guide you through the process step by step.
     
     # Main operation (optional for interactive mode)
     parser.add_argument('operation', nargs='?', 
-                       choices=['bookmarks', 'dm', 'channel', 'search', 'list'],
+                       choices=['later', 'dm', 'channel', 'search', 'list'],
                        help='What to export (omit for interactive mode)')
     
     # Common arguments
@@ -366,8 +366,8 @@ def main():
         operation = args.operation
     
     # Route to appropriate handler
-    if operation == 'bookmarks':
-        return cli.run_bookmarks(args)
+    if operation == 'later':
+        return cli.run_later(args)
     elif operation == 'dm':
         return cli.run_dm(args)
     elif operation == 'channel':
