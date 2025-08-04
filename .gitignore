@@ -205,3 +205,26 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Slack Export Tool specific ignores
+debug_*.py
+test_*.py
+simple_*.py
+simple_*.json
+*_export.md
+*_export.json
+.trash/
+*.md
+!README.md
+
+# User tokens (security)
+tokens.txt
+*.token
+
+# Export outputs (user-generated content)
+slack_*.md
+slack_*.json
+bookmarks_*.md
+bookmarks_*.json
+messages_*.md
+messages_*.json

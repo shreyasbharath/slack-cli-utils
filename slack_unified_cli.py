@@ -19,10 +19,10 @@ class SlackCLI:
         
         # Map operations to their corresponding scripts
         self.operations = {
-            'bookmarks': 'fetch_bookmarks.py',
+            'bookmarks': 'slack_bookmarks_fetcher.py',
             'dm': 'fetch_dm_history.py', 
-            'channel': 'fetch_channel_search.py',
-            'search': 'fetch_channel_search.py',
+            'channel': 'slack_posts_fetcher.py',
+            'search': 'slack_posts_fetcher.py',
             'list': 'list_conversations.py'
         }
     
@@ -103,7 +103,7 @@ class SlackCLI:
     
     def run_bookmarks(self, args) -> int:
         """Run bookmarks export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'fetch_bookmarks.py')]
+        cmd = ['python3', os.path.join(self.script_dir, 'slack_bookmarks_fetcher.py')]
         
         if args.interactive:
             token = self.get_token_interactively()
