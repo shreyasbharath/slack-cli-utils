@@ -158,16 +158,22 @@ python slack.py search -t "xoxp-your-token" -q "in:#general project after:2024-0
 #### Export All Messages from a Specific User
 ```bash
 # Get all messages from a user across DMs and channels (complete history)
-python slack.py search -t "xoxp-your-token" -q "from:@username" --monthly-chunks -o user_complete_history.md
+python slack.py search -t "xoxp-your-token" -q "from:@dan.martin" --monthly-chunks -o user_complete_history.md
 
-# User messages in a specific time period
-python slack.py search -t "xoxp-your-token" -q "from:@username after:2024-01-01 before:2024-12-31" --monthly-chunks -o user_2024_messages.md
+# User messages in a specific time period (e.g., all of 2024)
+python slack.py search -t "xoxp-your-token" -q "from:@dan.martin after:2024-01-01 before:2024-12-31" -o user_2024_messages.md
+
+# User messages from the last week (adjust date as needed)
+python slack.py search -t "xoxp-your-token" -q "from:@dan.martin after:2025-09-01" -o dan_martin_recent.md
 
 # User messages from the last 30 days
-python slack.py search -t "xoxp-your-token" -q "from:@username after:2024-11-08" -o user_recent_messages.md
+python slack.py search -t "xoxp-your-token" -q "from:@dan.martin after:2025-08-08" -o user_last_30_days.md
 
-# Alternative: Use user ID instead of username for more reliable results
-python slack.py search -t "xoxp-your-token" -q "from:U123456789 after:2024-01-01" --monthly-chunks -o user_messages_by_id.md
+# Alternative: Use user ID if username doesn't work (find ID with 'list' command)
+python slack.py search -t "xoxp-your-token" -q "from:U123456789 after:2025-09-01" -o user_messages_by_id.md
+
+# ⚠️ Important: Don't use --monthly-chunks with recent date ranges (causes date conflicts)
+# Only use --monthly-chunks for complete historical exports without specific date filters
 ```
 
 #### List Channels and DMs
@@ -181,7 +187,8 @@ python slack.py list -t "xoxp-your-token"
 When using search operations, you can use Slack's powerful search operators:
 
 ### User & Channel Operators
-- `from:@username` or `from:U123456` - Messages from specific user (across all channels and DMs)
+- `from:@username` - Messages from specific user using their Slack handle (recommended - works reliably)
+- `from:U123456` - Messages from specific user using User ID (alternative if handle doesn't work)
 - `to:@username` - Messages to specific user  
 - `in:#channel` - Messages in specific channel
 - `in:@username` - DMs with specific user only
@@ -296,17 +303,20 @@ python slack.py search -t "token" -q "from:me project-alpha" -o my_project_posts
 
 ### 3. User Message History Analysis
 ```bash
-# Export complete message history for a user (all channels + DMs)
-python slack.py search -t "token" -q "from:@username" --monthly-chunks -o complete_user_history.md
+# Export complete message history for a user (all channels + DMs) - use for historical data only
+python slack.py search -t "token" -q "from:@dan.martin" --monthly-chunks -o complete_user_history.md
 
-# User activity in specific time period  
-python slack.py search -t "token" -q "from:@username after:2024-01-01 before:2024-06-30" --monthly-chunks -o user_h1_2024.md
+# User activity in specific time period (don't use --monthly-chunks with date ranges)
+python slack.py search -t "token" -q "from:@dan.martin after:2024-01-01 before:2024-06-30" -o user_h1_2024.md
+
+# Recent user messages (last week/month)
+python slack.py search -t "token" -q "from:@dan.martin after:2025-08-01" -o user_recent.md
 
 # User messages with specific content
-python slack.py search -t "token" -q "from:@username deployment" --monthly-chunks -o user_deployment_messages.md
+python slack.py search -t "token" -q "from:@dan.martin deployment" -o user_deployment_messages.md
 
 # Export messages with attachments from user
-python slack.py search -t "token" -q "from:@username has:attachment" --monthly-chunks -o user_attachments.md
+python slack.py search -t "token" -q "from:@dan.martin has:attachment" -o user_attachments.md
 ```
 
 ### 4. Finding User IDs

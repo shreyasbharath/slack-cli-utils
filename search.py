@@ -306,16 +306,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python search.py -t "xoxp-token" -q "from:@username" -o user_posts.md
+  python search.py -t "xoxp-token" -q "from:@dan.martin" --monthly-chunks -o dan_all_messages.md
+  python search.py -t "xoxp-token" -q "from:@dan.martin after:2025-09-01" -o dan_recent.md
   python search.py -t "xoxp-token" -q "in:#general" --monthly-chunks
   python search.py -t "xoxp-token" -q "has:attachment" -m 500 -o files.json
 
 Search Query Examples:
-  - from:@username                    # Messages from specific user
+  - from:@dan.martin                  # Messages from user using Slack handle (RECOMMENDED)
+  - from:U123456789                   # Messages from user using ID (alternative)
   - in:#channel                       # Messages in specific channel
   - has:attachment                    # Messages with attachments
-  - after:2024-01-01                  # Messages after date
+  - after:2025-01-01                  # Messages after date
   - "exact phrase"                    # Messages containing exact phrase
+
+Tips:
+  - Use @username (Slack handle) - more reliable than User IDs
+  - DON'T use --monthly-chunks with recent date filters (causes conflicts)
+  - Use --monthly-chunks only for complete historical exports
 
 Required Slack API scopes:
   - search:read (to use search API)
