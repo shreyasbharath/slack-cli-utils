@@ -229,13 +229,13 @@ class SlackCLI:
             
             print("\n🔍 Search Query")
             print("Examples:")
-            print("  from:@dan.martin                        - ALL messages from user using Slack handle (RECOMMENDED)")
-            print("  from:@dan.martin after:2025-09-01       - User messages since Sept 1, 2025")
-            print("  from:@dan.martin after:2025-01-01 before:2025-12-31 - User messages in 2025")
+            print("  from:@john.smith                        - ALL messages from user using Slack handle (RECOMMENDED)")
+            print("  from:@john.smith after:2025-09-01       - User messages since Sept 1, 2025")
+            print("  from:@john.smith after:2025-01-01 before:2025-12-31 - User messages in 2025")
             print("  from:U123456789                         - Alternative: use user ID (if handle fails)")
             print("  has:attachment                          - Messages with attachments")
             print("  in:#channel project                     - Messages in channel containing 'project'")
-            print("  from:@dan.martin has:attachment         - User's messages with attachments")
+            print("  from:@john.smith has:attachment         - User's messages with attachments")
             print()
             print("💡 Tip: Use --monthly-chunks ONLY for complete historical exports (without date filters)")
             print("💡 Tip: For recent messages, DON'T use --monthly-chunks (causes date conflicts)")
@@ -317,19 +317,19 @@ Examples:
   python slack.py channel -t "xoxp-token" -q "in:#general" --monthly-chunks
 
   # Export ALL messages from a specific user (DMs + channels) - USE SLACK HANDLE
-  python slack.py search -t "xoxp-token" -q "from:@dan.martin" --monthly-chunks
+  python slack.py search -t "xoxp-token" -q "from:@john.smith" --monthly-chunks
 
   # User messages in specific time period (2025)
-  python slack.py search -t "xoxp-token" -q "from:@dan.martin after:2025-01-01 before:2025-12-31"
+  python slack.py search -t "xoxp-token" -q "from:@john.smith after:2025-01-01 before:2025-12-31"
 
   # User messages from last week (DON'T use --monthly-chunks for recent dates)
-  python slack.py search -t "xoxp-token" -q "from:@dan.martin after:2025-09-01"
+  python slack.py search -t "xoxp-token" -q "from:@john.smith after:2025-09-01"
 
   # Alternative: use user ID if Slack handle doesn't work
   python slack.py search -t "xoxp-token" -q "from:U123456789" --monthly-chunks
 
   # Search for messages with attachments from user
-  python slack.py search -t "xoxp-token" -q "from:@dan.martin has:attachment"
+  python slack.py search -t "xoxp-token" -q "from:@john.smith has:attachment"
 
   # List all channels and DMs (to find user IDs)
   python slack.py list -t "xoxp-token"

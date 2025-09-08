@@ -306,13 +306,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python search.py -t "xoxp-token" -q "from:@dan.martin" --monthly-chunks -o dan_all_messages.md
-  python search.py -t "xoxp-token" -q "from:@dan.martin after:2025-09-01" -o dan_recent.md
+  python search.py -t "xoxp-token" -q "from:@john.smith" --monthly-chunks -o user_all_messages.md
+  python search.py -t "xoxp-token" -q "from:@john.smith after:2025-09-01" -o user_recent.md
   python search.py -t "xoxp-token" -q "in:#general" --monthly-chunks
   python search.py -t "xoxp-token" -q "has:attachment" -m 500 -o files.json
 
 Search Query Examples:
-  - from:@dan.martin                  # Messages from user using Slack handle (RECOMMENDED)
+  - from:@john.smith                  # Messages from user using Slack handle (RECOMMENDED)
   - from:U123456789                   # Messages from user using ID (alternative)
   - in:#channel                       # Messages in specific channel
   - has:attachment                    # Messages with attachments
