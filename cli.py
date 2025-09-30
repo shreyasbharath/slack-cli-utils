@@ -102,6 +102,53 @@ class InteractivePrompts:
             print("❌ Search query is required")
     
     @staticmethod
+    def get_time_range_for_search() -> str:
+        """Get time range preferences and modify query accordingly."""
+        print("\n⏰ Time Range Options")
+        print("1. All time (use monthly chunks for complete history)")
+        print("2. Past week")
+        print("3. Past month")
+        print("4. This year (2025)")
+        print("5. Last year (2024)")
+        print("6. Custom date range")
+        print("7. No time filter (use current query as-is)")
+        print()
+        
+        choice = input("Select time range (1-7, default: 7): ").strip()
+        
+        if choice == '1':
+            return 'monthly_chunks'
+        elif choice == '2':
+            return 'after:2025-09-23'  # Past week from today (Sept 30)
+        elif choice == '3':  
+            return 'after:2025-08-30'  # Past month
+        elif choice == '4':
+            return 'after:2025-01-01 before:2025-12-31'
+        elif choice == '5':
+            return 'after:2024-01-01 before:2024-12-31'
+        elif choice == '6':
+            return InteractivePrompts._get_custom_date_range()
+        else:  # Default to no filter
+            return 'no_filter'
+    
+    @staticmethod
+    def _get_custom_date_range() -> str:
+        """Get custom start and end dates from user."""
+        print("\n📅 Custom Date Range")
+        print("Enter dates in YYYY-MM-DD format (leave blank to skip)")
+        
+        start_date = input("Start date (e.g., 2024-06-01): ").strip()
+        end_date = input("End date (e.g., 2024-12-31): ").strip()
+        
+        date_parts = []
+        if start_date:
+            date_parts.append(f"after:{start_date}")
+        if end_date:
+            date_parts.append(f"before:{end_date}")
+        
+        return ' '.join(date_parts) if date_parts else 'no_filter'
+    
+    @staticmethod
     def get_page_size() -> Optional[str]:
         """Get page size with validation."""
         page_size = input("\nPage size for fetching (default: 100): ").strip()
@@ -306,9 +353,22 @@ class OperationHandler:
     def _run_channel_interactive(self, cmd: List[str]) -> int:
         """Run channel export interactively."""
         token = self.prompts.get_token()
-        query = self.prompts.get_channel_query()
+        base_query = self.prompts.get_channel_query()
+        
+        # Get time range preferences
+        time_filter = self.prompts.get_time_range_for_search()
+        
+        # Build final query and determine if monthly chunks should be used
+        use_chunks = False
+        if time_filter == 'monthly_chunks':
+            query = base_query
+            use_chunks = True
+        elif time_filter == 'no_filter':
+            query = base_query
+        else:
+            query = f"{base_query} {time_filter}".strip()
+        
         output = self.prompts.get_output_filename('channel')
-        use_chunks = self.prompts.use_monthly_chunks()
         
         self.cmd_builder.add_common_params(cmd, token, output)
         cmd.extend(['-q', query])
@@ -343,16 +403,31 @@ class OperationHandler:
     def _run_search_interactive(self, cmd: List[str]) -> int:
         """Run search export interactively."""
         token = self.prompts.get_token()
-        query = self.prompts.get_search_query()
+        base_query = self.prompts.get_search_query()
+        
+        # Get time range preferences
+        time_filter = self.prompts.get_time_range_for_search()
+        
+        # Build final query and determine if monthly chunks should be used
+        use_chunks = False
+        if time_filter == 'monthly_chunks':
+            query = base_query
+            use_chunks = True
+        elif time_filter == 'no_filter':
+            query = base_query
+        else:
+            query = f"{base_query} {time_filter}".strip()
+        
         output = self.prompts.get_output_filename('search')
         
         self.cmd_builder.add_common_params(cmd, token, output)
         cmd.extend(['-q', query])
         
-        max_results = self.prompts.get_max_results()
-        self.cmd_builder.add_optional_param(cmd, '-m', max_results)
+        # Only ask for max results if not using monthly chunks
+        if not use_chunks:
+            max_results = self.prompts.get_max_results()
+            self.cmd_builder.add_optional_param(cmd, '-m', max_results)
         
-        use_chunks = self.prompts.use_monthly_chunks()
         self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
         
         return self.execute_command(cmd)
