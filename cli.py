@@ -13,67 +13,13 @@ import subprocess
 from datetime import datetime
 from typing import Optional, List
 
-class SlackCLI:
-    def __init__(self):
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Map operations to their corresponding scripts
-        self.operations = {
-            'later': 'later.py',
-            'dm': 'history.py', 
-            'channel': 'search.py',
-            'search': 'search.py',
-            'list': 'list.py'
-        }
+
+class InteractivePrompts:
+    """Handles all user input prompts."""
     
-    def show_interactive_menu(self) -> str:
-        """Show interactive menu and return selected operation."""
-        print("\n🚀 Slack Export Tool")
-        print("=" * 50)
-        print("What would you like to export?")
-        print()
-        print("1. 📌 Saved Messages (Later)")
-        print("   Export all messages you've saved for later across all channels")
-        print()
-        print("2. 💬 Direct Messages (DMs)")
-        print("   Export conversation history from a specific DM")
-        print()
-        print("3. 📺 Channel Messages")
-        print("   Export all messages from a specific channel")
-        print()
-        print("4. 🔍 Search Messages")
-        print("   Search and export messages using Slack's search syntax")
-        print()
-        print("5. 📋 List Channels/DMs")
-        print("   Show all available channels and DMs with their IDs")
-        print()
-        print("6. ❌ Exit")
-        print()
-        
-        while True:
-            try:
-                choice = input("Enter your choice (1-6): ").strip()
-                if choice == '1':
-                    return 'later'
-                elif choice == '2':
-                    return 'dm'
-                elif choice == '3':
-                    return 'channel'
-                elif choice == '4':
-                    return 'search'
-                elif choice == '5':
-                    return 'list'
-                elif choice == '6':
-                    print("Goodbye! 👋")
-                    sys.exit(0)
-                else:
-                    print("❌ Invalid choice. Please enter 1-6.")
-            except KeyboardInterrupt:
-                print("\n\nGoodbye! 👋")
-                sys.exit(0)
-    
-    def get_token_interactively(self) -> str:
-        """Get Slack token from user interactively."""
+    @staticmethod
+    def get_token() -> str:
+        """Get Slack token from user."""
         print("\n🔑 Slack Token Required")
         print("You need a Slack User OAuth Token (starts with 'xoxp-')")
         print("Get one at: https://api.slack.com/apps")
@@ -88,204 +34,351 @@ class SlackCLI:
             else:
                 print("❌ Token should start with 'xoxp-'")
     
-    def get_output_file_interactively(self, operation: str, default_extension: str = 'md') -> str:
-        """Get output filename from user interactively."""
+    @staticmethod
+    def get_output_filename(operation: str, extension: str = 'md') -> str:
+        """Get output filename from user."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"slack_{operation}_{timestamp}.{default_extension}"
+        default_name = f"slack_{operation}_{timestamp}.{extension}"
         
         print(f"\n📁 Output File")
         filename = input(f"Output filename (default: {default_name}): ").strip()
         
-        if not filename:
-            filename = default_name
-        
-        return filename
+        return filename if filename else default_name
     
-    def run_later(self, args) -> int:
-        """Run saved messages (later) export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'later.py')]
+    @staticmethod
+    def get_channel_id() -> str:
+        """Get DM channel ID from user."""
+        print("\n💬 DM Channel Information")
+        print("You'll need the DM channel ID. Run 'list' operation first if you don't know it.")
         
-        if args.interactive:
-            token = self.get_token_interactively()
-            output = self.get_output_file_interactively('bookmarks')
-            cmd.extend(['-t', token, '-o', output])
-            
-            # Ask about page size
-            page_size = input("\nPage size for fetching (default: 100): ").strip()
-            if page_size and page_size.isdigit():
-                cmd.extend(['--page-size', page_size])
-        else:
-            if not args.token:
-                print("❌ Error: --token is required for bookmarks export")
-                return 1
-            
-            cmd.extend(['-t', args.token])
-            
-            if args.output:
-                cmd.extend(['-o', args.output])
-            
-            if args.page_size:
-                cmd.extend(['--page-size', str(args.page_size)])
-        
-        print(f"\n🚀 Running: {' '.join(cmd[2:])}")  # Hide python3 path
-        return subprocess.run(cmd).returncode
-    
-    def run_dm(self, args) -> int:
-        """Run DM export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'history.py')]
-        
-        if args.interactive:
-            token = self.get_token_interactively()
-            
-            print("\n💬 DM Channel Information")
-            print("You'll need the DM channel ID. Run 'list' operation first if you don't know it.")
+        while True:
             channel = input("Enter DM channel ID (e.g., D0889Q50GPM): ").strip()
-            
-            if not channel:
-                print("❌ Channel ID is required")
-                return 1
-            
-            output = self.get_output_file_interactively('dm')
-            
-            print("\n📅 Date Range")
-            since = input("Start date (YYYY-MM-DD, default: 2025-01-01): ").strip()
-            if not since:
-                since = '2025-01-01'
-            
-            cmd.extend(['-t', token, '-c', channel, '-o', output, '-s', since])
-        else:
-            if not args.token or not args.channel:
-                print("❌ Error: --token and --channel are required for DM export")
-                return 1
-            
-            cmd.extend(['-t', args.token, '-c', args.channel])
-            
-            if args.output:
-                cmd.extend(['-o', args.output])
-            
-            if args.since:
-                cmd.extend(['-s', args.since])
-        
-        print(f"\n🚀 Running: {' '.join(cmd[2:])}")
-        return subprocess.run(cmd).returncode
+            if channel:
+                return channel
+            print("❌ Channel ID is required")
     
-    def run_channel(self, args) -> int:
-        """Run channel export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'search.py')]
+    @staticmethod
+    def get_date_range() -> str:
+        """Get start date for DM export."""
+        print("\n📅 Date Range")
+        since = input("Start date (YYYY-MM-DD, default: 2025-01-01): ").strip()
+        return since if since else '2025-01-01'
+    
+    @staticmethod
+    def get_channel_query() -> str:
+        """Get channel information and build query."""
+        print("\n📺 Channel Information")
+        print("Enter the channel name (e.g., #general) or ID")
         
-        if args.interactive:
-            token = self.get_token_interactively()
-            
-            print("\n📺 Channel Information")
-            print("Enter the channel name (e.g., #general) or ID")
+        while True:
             channel = input("Channel name/ID: ").strip()
-            
             if not channel:
                 print("❌ Channel name/ID is required")
-                return 1
+                continue
             
-            # Build query for channel
             if channel.startswith('#'):
-                query = f"in:{channel}"
-            elif channel.startswith('C'):  # Channel ID
-                query = f"in:#{channel}"  # Let Slack handle ID lookup
+                return f"in:{channel}"
+            elif channel.startswith('C'):
+                return f"in:#{channel}"
             else:
-                query = f"in:#{channel}"  # Assume it's a channel name
-            
-            output = self.get_output_file_interactively('channel')
-            
-            # Ask about monthly chunks for complete history
-            use_chunks = input("\nUse monthly chunks for complete history? (y/N): ").strip().lower()
-            
-            cmd.extend(['-t', token, '-q', query, '-o', output])
-            
-            if use_chunks == 'y':
-                cmd.append('--monthly-chunks')
-        else:
-            if not args.token or not args.query:
-                print("❌ Error: --token and --query are required for channel export")
-                return 1
-            
-            cmd.extend(['-t', args.token, '-q', args.query])
-            
-            if args.output:
-                cmd.extend(['-o', args.output])
-            
-            if args.monthly_chunks:
-                cmd.append('--monthly-chunks')
-            
-            if args.max_results:
-                cmd.extend(['-m', str(args.max_results)])
-        
-        print(f"\n🚀 Running: {' '.join(cmd[2:])}")
-        return subprocess.run(cmd).returncode
+                return f"in:#{channel}"
     
-    def run_search(self, args) -> int:
-        """Run search export."""
-        cmd = ['python3', os.path.join(self.script_dir, 'search.py')]
+    @staticmethod
+    def get_search_query() -> str:
+        """Get search query from user with examples."""
+        print("\n🔍 Search Query")
+        print("Examples:")
+        print("  from:@john.smith                        - ALL messages from user using Slack handle")
+        print("  from:@john.smith after:2025-09-01       - User messages since Sept 1, 2025")
+        print("  from:U123456789                         - Alternative: use user ID")
+        print("  has:attachment                          - Messages with attachments")
+        print("  in:#channel project                     - Messages in channel containing 'project'")
+        print()
         
-        if args.interactive:
-            token = self.get_token_interactively()
-            
-            print("\n🔍 Search Query")
-            print("Examples:")
-            print("  from:@john.smith                        - ALL messages from user using Slack handle (RECOMMENDED)")
-            print("  from:@john.smith after:2025-09-01       - User messages since Sept 1, 2025")
-            print("  from:@john.smith after:2025-01-01 before:2025-12-31 - User messages in 2025")
-            print("  from:U123456789                         - Alternative: use user ID (if handle fails)")
-            print("  has:attachment                          - Messages with attachments")
-            print("  in:#channel project                     - Messages in channel containing 'project'")
-            print("  from:@john.smith has:attachment         - User's messages with attachments")
-            print()
-            print("💡 Tip: Use --monthly-chunks ONLY for complete historical exports (without date filters)")
-            print("💡 Tip: For recent messages, DON'T use --monthly-chunks (causes date conflicts)")
-            print("💡 Tip: Use @username (Slack handle) - more reliable than User IDs")
-            print()
-            
+        while True:
             query = input("Enter search query: ").strip()
-            
-            if not query:
-                print("❌ Search query is required")
-                return 1
-            
-            output = self.get_output_file_interactively('search')
-            
-            # Ask about options
-            max_results = input("Max results (default: 100): ").strip()
-            use_chunks = input("Use monthly chunks for complete history? (y/N): ").strip().lower()
-            
-            cmd.extend(['-t', token, '-q', query, '-o', output])
-            
-            if max_results and max_results.isdigit():
-                cmd.extend(['-m', max_results])
-            
-            if use_chunks == 'y':
-                cmd.append('--monthly-chunks')
-        else:
-            if not args.token or not args.query:
-                print("❌ Error: --token and --query are required for search")
-                return 1
-            
-            cmd.extend(['-t', args.token, '-q', args.query])
-            
-            if args.output:
-                cmd.extend(['-o', args.output])
-            
-            if args.max_results:
-                cmd.extend(['-m', str(args.max_results)])
-            
-            if args.monthly_chunks:
-                cmd.append('--monthly-chunks')
+            if query:
+                return query
+            print("❌ Search query is required")
+    
+    @staticmethod
+    def get_page_size() -> Optional[str]:
+        """Get page size with validation."""
+        page_size = input("\nPage size for fetching (default: 100): ").strip()
+        return page_size if page_size and page_size.isdigit() else None
+    
+    @staticmethod
+    def get_max_results() -> Optional[str]:
+        """Get max results with validation."""
+        max_results = input("Max results (default: 100): ").strip()
+        return max_results if max_results and max_results.isdigit() else None
+    
+    @staticmethod
+    def use_monthly_chunks() -> bool:
+        """Ask if user wants monthly chunks."""
+        response = input("\nUse monthly chunks for complete history? (y/N): ").strip().lower()
+        return response == 'y'
+
+
+class MenuDisplay:
+    """Handles menu display and user choice selection."""
+    
+    @staticmethod
+    def show_main_menu() -> str:
+        """Display main menu and return selected operation."""
+        print("\n🚀 Slack Export Tool")
+        print("=" * 50)
+        print("What would you like to export?")
+        print()
+        print("1. 📌 Saved Messages (Later)")
+        print("   Export all messages you've saved for later across all channels")
+        print("2. 💬 Direct Messages (DMs)")
+        print("   Export conversation history from a specific DM")
+        print("3. 📺 Channel Messages")
+        print("   Export all messages from a specific channel")
+        print("4. 🔍 Search Messages")
+        print("   Search and export messages using Slack's search syntax")
+        print("5. 📋 List Channels/DMs")
+        print("   Show all available channels and DMs with their IDs")
+        print("6. ❌ Exit")
+        print()
         
+        return MenuDisplay._get_user_choice()
+    
+    @staticmethod
+    def _get_user_choice() -> str:
+        """Get and validate user menu choice."""
+        choice_map = {
+            '1': 'later',
+            '2': 'dm', 
+            '3': 'channel',
+            '4': 'search',
+            '5': 'list',
+            '6': 'exit'
+        }
+        
+        while True:
+            try:
+                choice = input("Enter your choice (1-6): ").strip()
+                if choice == '6':
+                    print("Goodbye! 👋")
+                    sys.exit(0)
+                elif choice in choice_map:
+                    return choice_map[choice]
+                else:
+                    print("❌ Invalid choice. Please enter 1-6.")
+            except KeyboardInterrupt:
+                print("\n\nGoodbye! 👋")
+                sys.exit(0)
+
+
+class CommandBuilder:
+    """Builds command arguments for subprocess execution."""
+    
+    def __init__(self, script_dir: str):
+        self.script_dir = script_dir
+        
+        # Map operations to their corresponding scripts
+        self.operation_scripts = {
+            'later': 'later.py',
+            'dm': 'history.py', 
+            'channel': 'search.py',
+            'search': 'search.py',
+            'list': 'list.py'
+        }
+    
+    def build_base_command(self, operation: str) -> List[str]:
+        """Build base command with script path."""
+        script_name = self.operation_scripts[operation]
+        return ['python3', os.path.join(self.script_dir, script_name)]
+    
+    def add_common_params(self, cmd: List[str], token: str, output: str) -> None:
+        """Add common token and output parameters."""
+        cmd.extend(['-t', token, '-o', output])
+    
+    def add_optional_param(self, cmd: List[str], flag: str, value: Optional[str]) -> None:
+        """Add optional parameter if value exists."""
+        if value:
+            cmd.extend([flag, value])
+    
+    def add_flag_if_true(self, cmd: List[str], flag: str, condition: bool) -> None:
+        """Add flag if condition is true."""
+        if condition:
+            cmd.append(flag)
+
+
+class OperationHandler:
+    """Handles execution of specific Slack export operations."""
+    
+    def __init__(self, script_dir: str):
+        self.script_dir = script_dir
+        self.prompts = InteractivePrompts()
+        self.cmd_builder = CommandBuilder(script_dir)
+    
+    def should_run_interactively(self, args, required_params: List[str]) -> bool:
+        """Determine if operation should run in interactive mode."""
+        if args.interactive:
+            return True
+        
+        return any(not getattr(args, param, None) for param in required_params)
+    
+    def execute_command(self, cmd: List[str]) -> int:
+        """Execute command and return exit code."""
         print(f"\n🚀 Running: {' '.join(cmd[2:])}")
         return subprocess.run(cmd).returncode
     
-    def run_list(self, args) -> int:
-        """Run channel/DM listing."""
-        cmd = ['python3', os.path.join(self.script_dir, 'list.py')]
+    def run_later_export(self, args) -> int:
+        """Run saved messages (bookmarks) export."""
+        cmd = self.cmd_builder.build_base_command('later')
         
-        if args.interactive:
-            token = self.get_token_interactively()
+        if self.should_run_interactively(args, ['token']):
+            return self._run_later_interactive(cmd)
+        else:
+            return self._run_later_direct(cmd, args)
+    
+    def _run_later_interactive(self, cmd: List[str]) -> int:
+        """Run bookmarks export interactively."""
+        token = self.prompts.get_token()
+        output = self.prompts.get_output_filename('bookmarks')
+        
+        self.cmd_builder.add_common_params(cmd, token, output)
+        
+        page_size = self.prompts.get_page_size()
+        self.cmd_builder.add_optional_param(cmd, '--page-size', page_size)
+        
+        return self.execute_command(cmd)
+    
+    def _run_later_direct(self, cmd: List[str], args) -> int:
+        """Run bookmarks export with direct arguments."""
+        if not args.token:
+            print("❌ Error: --token is required for bookmarks export")
+            return 1
+        
+        cmd.extend(['-t', args.token])
+        self.cmd_builder.add_optional_param(cmd, '-o', args.output)
+        
+        if args.page_size:
+            cmd.extend(['--page-size', str(args.page_size)])
+        
+        return self.execute_command(cmd)
+    
+    def run_dm_export(self, args) -> int:
+        """Run DM export."""
+        cmd = self.cmd_builder.build_base_command('dm')
+        
+        if self.should_run_interactively(args, ['token', 'channel']):
+            return self._run_dm_interactive(cmd)
+        else:
+            return self._run_dm_direct(cmd, args)
+    
+    def _run_dm_interactive(self, cmd: List[str]) -> int:
+        """Run DM export interactively."""
+        token = self.prompts.get_token()
+        channel = self.prompts.get_channel_id()
+        output = self.prompts.get_output_filename('dm')
+        since = self.prompts.get_date_range()
+        
+        cmd.extend(['-t', token, '-c', channel, '-o', output, '-s', since])
+        
+        return self.execute_command(cmd)
+    
+    def _run_dm_direct(self, cmd: List[str], args) -> int:
+        """Run DM export with direct arguments."""
+        if not args.token or not args.channel:
+            print("❌ Error: --token and --channel are required for DM export")
+            return 1
+        
+        cmd.extend(['-t', args.token, '-c', args.channel])
+        self.cmd_builder.add_optional_param(cmd, '-o', args.output)
+        self.cmd_builder.add_optional_param(cmd, '-s', args.since)
+        
+        return self.execute_command(cmd)
+    
+    def run_channel_export(self, args) -> int:
+        """Run channel export."""
+        cmd = self.cmd_builder.build_base_command('channel')
+        
+        if self.should_run_interactively(args, ['token', 'query']):
+            return self._run_channel_interactive(cmd)
+        else:
+            return self._run_channel_direct(cmd, args)
+    
+    def _run_channel_interactive(self, cmd: List[str]) -> int:
+        """Run channel export interactively."""
+        token = self.prompts.get_token()
+        query = self.prompts.get_channel_query()
+        output = self.prompts.get_output_filename('channel')
+        use_chunks = self.prompts.use_monthly_chunks()
+        
+        self.cmd_builder.add_common_params(cmd, token, output)
+        cmd.extend(['-q', query])
+        self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
+        
+        return self.execute_command(cmd)
+    
+    def _run_channel_direct(self, cmd: List[str], args) -> int:
+        """Run channel export with direct arguments."""
+        if not args.token or not args.query:
+            print("❌ Error: --token and --query are required for channel export")
+            return 1
+        
+        cmd.extend(['-t', args.token, '-q', args.query])
+        self.cmd_builder.add_optional_param(cmd, '-o', args.output)
+        self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', args.monthly_chunks)
+        
+        if args.max_results:
+            cmd.extend(['-m', str(args.max_results)])
+        
+        return self.execute_command(cmd)
+    
+    def run_search_export(self, args) -> int:
+        """Run search export."""
+        cmd = self.cmd_builder.build_base_command('search')
+        
+        if self.should_run_interactively(args, ['token', 'query']):
+            return self._run_search_interactive(cmd)
+        else:
+            return self._run_search_direct(cmd, args)
+    
+    def _run_search_interactive(self, cmd: List[str]) -> int:
+        """Run search export interactively."""
+        token = self.prompts.get_token()
+        query = self.prompts.get_search_query()
+        output = self.prompts.get_output_filename('search')
+        
+        self.cmd_builder.add_common_params(cmd, token, output)
+        cmd.extend(['-q', query])
+        
+        max_results = self.prompts.get_max_results()
+        self.cmd_builder.add_optional_param(cmd, '-m', max_results)
+        
+        use_chunks = self.prompts.use_monthly_chunks()
+        self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
+        
+        return self.execute_command(cmd)
+    
+    def _run_search_direct(self, cmd: List[str], args) -> int:
+        """Run search export with direct arguments."""
+        if not args.token or not args.query:
+            print("❌ Error: --token and --query are required for search")
+            return 1
+        
+        cmd.extend(['-t', args.token, '-q', args.query])
+        self.cmd_builder.add_optional_param(cmd, '-o', args.output)
+        
+        if args.max_results:
+            cmd.extend(['-m', str(args.max_results)])
+        
+        self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', args.monthly_chunks)
+        
+        return self.execute_command(cmd)
+    
+    def run_list_operation(self, args) -> int:
+        """Run channel/DM listing."""
+        cmd = self.cmd_builder.build_base_command('list')
+        
+        if self.should_run_interactively(args, ['token']):
+            token = self.prompts.get_token()
             cmd.extend(['-t', token])
         else:
             if not args.token:
@@ -293,8 +386,42 @@ class SlackCLI:
                 return 1
             cmd.extend(['-t', args.token])
         
-        print(f"\n🚀 Running: {' '.join(cmd[2:])}")
-        return subprocess.run(cmd).returncode
+        return self.execute_command(cmd)
+
+
+class SlackCLI:
+    """Main CLI coordinator class."""
+    
+    def __init__(self):
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.handler = OperationHandler(self.script_dir)
+        self.menu = MenuDisplay()
+    
+    def run(self, args) -> int:
+        """Main entry point for CLI execution."""
+        operation = self._determine_operation(args)
+        
+        # Route to appropriate handler
+        operation_map = {
+            'later': self.handler.run_later_export,
+            'dm': self.handler.run_dm_export,
+            'channel': self.handler.run_channel_export,
+            'search': self.handler.run_search_export,
+            'list': self.handler.run_list_operation
+        }
+        
+        if operation in operation_map:
+            return operation_map[operation](args)
+        else:
+            print(f"❌ Unknown operation: {operation}")
+            return 1
+    
+    def _determine_operation(self, args) -> str:
+        """Determine which operation to run."""
+        if not args.operation or args.interactive:
+            return self.menu.show_main_menu()
+        return args.operation
+
 
 
 def create_parser():
@@ -316,22 +443,10 @@ Examples:
   # Export channel with complete history
   python slack.py channel -t "xoxp-token" -q "in:#general" --monthly-chunks
 
-  # Export ALL messages from a specific user (DMs + channels) - USE SLACK HANDLE
+  # Search for messages from user
   python slack.py search -t "xoxp-token" -q "from:@john.smith" --monthly-chunks
 
-  # User messages in specific time period (2025)
-  python slack.py search -t "xoxp-token" -q "from:@john.smith after:2025-01-01 before:2025-12-31"
-
-  # User messages from last week (DON'T use --monthly-chunks for recent dates)
-  python slack.py search -t "xoxp-token" -q "from:@john.smith after:2025-09-01"
-
-  # Alternative: use user ID if Slack handle doesn't work
-  python slack.py search -t "xoxp-token" -q "from:U123456789" --monthly-chunks
-
-  # Search for messages with attachments from user
-  python slack.py search -t "xoxp-token" -q "from:@john.smith has:attachment"
-
-  # List all channels and DMs (to find user IDs)
+  # List all channels and DMs
   python slack.py list -t "xoxp-token"
 
 Interactive mode will guide you through the process step by step.
@@ -373,31 +488,12 @@ Interactive mode will guide you through the process step by step.
 
 
 def main():
+    """Main entry point."""
     parser = create_parser()
     args = parser.parse_args()
     
     cli = SlackCLI()
-    
-    # Determine operation
-    if not args.operation or args.interactive:
-        operation = cli.show_interactive_menu()
-    else:
-        operation = args.operation
-    
-    # Route to appropriate handler
-    if operation == 'later':
-        return cli.run_later(args)
-    elif operation == 'dm':
-        return cli.run_dm(args)
-    elif operation == 'channel':
-        return cli.run_channel(args)
-    elif operation == 'search':
-        return cli.run_search(args)
-    elif operation == 'list':
-        return cli.run_list(args)
-    else:
-        print(f"❌ Unknown operation: {operation}")
-        return 1
+    return cli.run(args)
 
 
 if __name__ == '__main__':
