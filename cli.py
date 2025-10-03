@@ -274,6 +274,54 @@ class OperationHandler:
         print(f"\n🚀 Running: {' '.join(cmd[2:])}")
         return subprocess.run(cmd).returncode
     
+    def execute_with_limit_check(self, cmd: List[str], token: str, query: str, output: str) -> int:
+        """Execute command and offer to re-run with monthly chunks if limit hit."""
+        # Run the command
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Print the output as it happens
+        print(result.stdout, end='')
+        if result.stderr:
+            print(result.stderr, end='', file=sys.stderr)
+        
+        # Check if we hit the limit (look for the warning in output)
+        if "⚠️  WARNING: Result limit reached!" in result.stdout:
+            print()  # Add spacing
+            response = input("Would you like to re-export with monthly chunks for complete history? (Y/n): ").strip().lower()
+            
+            if response in ['', 'y', 'yes']:
+                # Extract date range from original query
+                import re
+                after_match = re.search(r'after:(\d{4}-\d{2}-\d{2})', query)
+                before_match = re.search(r'before:(\d{4}-\d{2}-\d{2})', query)
+                
+                # Extract base query (channel specification)
+                base_query = query.split(' after:')[0].split(' before:')[0].strip()
+                
+                # Build new command with monthly chunks
+                new_cmd = self.cmd_builder.build_base_command('channel')
+                new_cmd.extend(['-t', token, '-q', base_query, '-o', output, '--monthly-chunks'])
+                
+                # Add date range if it was specified
+                if after_match:
+                    new_cmd.extend(['--start-date', after_match.group(1)])
+                if before_match:
+                    new_cmd.extend(['--end-date', before_match.group(1)])
+                
+                print("\n✨ Re-running with monthly chunks for complete history")
+                if after_match or before_match:
+                    date_range = []
+                    if after_match:
+                        date_range.append(f"from {after_match.group(1)}")
+                    if before_match:
+                        date_range.append(f"to {before_match.group(1)}")
+                    print(f"   Within your specified range: {' '.join(date_range)}")
+                print("   This may take longer but ensures all messages are retrieved\n")
+                
+                return subprocess.run(new_cmd).returncode
+        
+        return result.returncode
+    
     def run_later_export(self, args) -> int:
         """Run saved messages (bookmarks) export."""
         cmd = self.cmd_builder.build_base_command('later')
@@ -370,11 +418,20 @@ class OperationHandler:
         
         output = self.prompts.get_output_filename('channel')
         
+        # Inform user about complete history mode
+        if use_chunks:
+            print("\n✨ Using monthly chunks to fetch complete channel history")
+            print("   This may take longer but ensures all messages are retrieved")
+        
         self.cmd_builder.add_common_params(cmd, token, output)
         cmd.extend(['-q', query])
         self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
         
-        return self.execute_command(cmd)
+        # Use special executor that checks for limit if not already using chunks
+        if not use_chunks:
+            return self.execute_with_limit_check(cmd, token, query, output)
+        else:
+            return self.execute_command(cmd)
     
     def _run_channel_direct(self, cmd: List[str], args) -> int:
         """Run channel export with direct arguments."""

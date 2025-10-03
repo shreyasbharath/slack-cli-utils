@@ -273,7 +273,10 @@ class SlackPostsFetcher(SlackExporter):
             
             if not messages:
                 self.logger.warning("No messages found matching the search criteria")
-                return 0
+                return 0, False
+            
+            # Check if we likely hit the limit
+            hit_limit = len(messages) >= config.max_results and not config.monthly_chunks
             
             # Enrich messages
             enriched_messages = self.enrich_messages(messages)
@@ -293,11 +296,12 @@ class SlackPostsFetcher(SlackExporter):
             export_time = (datetime.now() - start_time).total_seconds()
             self.export_summary(output_file, len(enriched_messages), export_time)
             
-            return len(enriched_messages)
+            # Return count and whether we hit limit
+            return len(enriched_messages), hit_limit
             
         except Exception as e:
             self.logger.error(f"Export failed: {e}")
-            return 0
+            return 0, False
 
 
 def main():
@@ -367,10 +371,20 @@ Required Slack API scopes:
     
     try:
         fetcher = SlackPostsFetcher(args.token)
-        message_count = fetcher.search_and_export(config, args.output)
+        message_count, hit_limit = fetcher.search_and_export(config, args.output)
         
         if message_count > 0:
             print(f"\n🎉 Successfully exported {message_count} messages to {args.output}")
+            
+            # Show warning if we hit the limit
+            if hit_limit:
+                print("\n⚠️  WARNING: Result limit reached!")
+                print(f"   Exported {message_count} messages, but there may be more.")
+                print(f"   To get complete history, re-run with:")
+                print(f"   --monthly-chunks  (recommended for complete history)")
+                print(f"   OR")
+                print(f"   -m 1000  (to increase max results)")
+            
             return 0
         else:
             print(f"\n⚠️  No messages found or export failed")
