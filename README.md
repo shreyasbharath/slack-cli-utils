@@ -365,6 +365,26 @@ All tools handle rate limits automatically:
 3. **Start Small**: Try exporting saved messages first to test your token
 4. **Check Scopes**: Ensure your token has required permissions
 
+## Known Limitations
+
+### Saved Messages Cannot Be Filtered by Status
+
+**Important**: The saved messages export retrieves ALL messages you've ever saved, including both:
+- ✅ Active/in-progress items you still need to act on
+- ✔️ Completed items you've marked as done
+
+**Why this limitation exists:**
+- Slack's `search.messages` API (used for saved messages) does not expose completion status
+- The deprecated `stars.list` API no longer tracks new saved items
+- The newer `slackLists.items.list` API requires knowing a specific list ID and additional scopes not practical for general use
+- Search operators like `is:saved_completed` do not exist in Slack's search syntax
+
+**Workaround:**
+Export all saved messages and manually filter them, or use Slack's UI to review completion status before exporting. The export will include all metadata (channel, user, date, text) to help with manual filtering.
+
+**Example:**
+If Slack shows you have 55 active saved items, the export may contain 300+ messages because it includes your entire saved message history (active + completed + archived).
+
 ## Tips for Best Results
 
 1. **Use Interactive Mode**: Easiest way to get started
