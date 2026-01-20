@@ -33,6 +33,7 @@ The interactive mode will guide you through:
 - 💾 **Multiple Formats**: Markdown, JSON, JSONL output
 - 🔄 **Smart Rate Limiting**: Automatic backoff and retry
 - 📝 **Rich Context**: Channel names, user names, timestamps, reactions
+- 📎 **Attachment Downloads**: Optionally download files alongside exports with organized folder structure
 - ⚡ **Optimized Performance**: Streaming writes, concurrent processing
 
 ## Prerequisites
@@ -123,6 +124,12 @@ python slack.py later -t "xoxp-your-token" -o saved.json
 
 # Custom page size
 python slack.py later -t "xoxp-your-token" --page-size 50 -o saved.md
+
+# Download attachments from saved messages
+python slack.py later -t "xoxp-your-token" -o my_saved_messages.md --download-attachments
+
+# Custom attachments directory
+python slack.py later -t "xoxp-your-token" -o my_saved_messages.md --download-attachments --attachments-dir ./my_attachments
 ```
 
 #### Export DM Conversation
@@ -132,6 +139,12 @@ python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM --since 2024-01-01
 
 # Recent messages only (default: 2025-01-01)
 python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM -o conversation.md
+
+# Export DM with attachments
+python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM -o conversation.md --download-attachments
+
+# Export DM with specific attachment directory
+python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM -o conversation.md --download-attachments --attachments-dir ./dm_files
 ```
 
 #### Export Channel Messages
@@ -153,6 +166,12 @@ python slack.py search -t "xoxp-your-token" -q "has:attachment" --monthly-chunks
 
 # Complex search with custom limit
 python slack.py search -t "xoxp-your-token" -q "in:#general project after:2024-01-01" -m 500
+
+# Download all attachments from messages
+python slack.py search -t "xoxp-your-token" -q "has:attachment" --monthly-chunks --download-attachments
+
+# Download attachments from specific user's messages
+python slack.py search -t "xoxp-your-token" -q "from:@john.smith has:attachment" -m 500 --download-attachments --attachments-dir ./john_files
 ```
 
 #### Export All Messages from a Specific User
@@ -218,6 +237,111 @@ When using search operations, you can use Slack's powerful search operators:
 # User messages mentioning specific topics
 "from:@username (project OR deployment OR release)"
 ```
+
+## Attachment Downloads
+
+You can optionally download attachment files (images, PDFs, documents, etc.) alongside your message exports. Files are organized by channel in a structured folder hierarchy with date-prefixed filenames.
+
+### Basic Usage
+
+#### Interactive Mode
+When running the tool in interactive mode, you'll be prompted:
+```bash
+python slack.py
+# After selecting export type and entering settings:
+# 📎 Attachment Download Options
+# Download attachments to local disk? (y/N): y
+# Attachments directory (default: <output>_attachments):
+```
+
+#### Direct Commands
+```bash
+# Download attachments with saved messages
+python slack.py later -t "xoxp-your-token" --download-attachments
+
+# Custom attachments directory
+python slack.py dm -t "xoxp-your-token" -c D0889Q50GPM --download-attachments --attachments-dir ./dm_files
+
+# Download files from search results
+python slack.py search -t "xoxp-your-token" -q "has:attachment" --download-attachments --monthly-chunks
+```
+
+### Folder Structure
+
+Downloaded files are organized by channel with date-prefixed filenames:
+
+```
+slack_export_20260120/                          # Export directory
+├── saved_messages.md                           # Main export file
+└── saved_messages_attachments/                 # Attachment root directory
+    ├── general_C123ABC/                        # Channel-based folder
+    │   ├── 20260115_U12AB_document.pdf         # Format: YYYYMMDD_USERID_filename
+    │   ├── 20260115_U12AB_document_1.pdf       # Auto-incremented for duplicates
+    │   └── 20260116_U456DEF_image.png
+    ├── engineering_C456DEF/
+    │   └── 20260114_deployment_log.txt
+    └── dm_dm_john_smith_D789GHI/               # DM conversations
+        └── 20260112_U98XYZ_screenshot.png
+```
+
+**Key Features:**
+- **Organized**: Files grouped by channel for easy browsing
+- **Date Prefixed**: Sort files chronologically with YYYYMMDD format
+- **Collision Handling**: Automatic numbering for duplicate filenames
+- **Relative Paths**: Export markdown files reference local paths for easy access
+
+### What Gets Downloaded
+
+- **Images**: PNG, JPG, GIF, etc.
+- **Documents**: PDF, Word, Excel, etc.
+- **Archives**: ZIP, TAR, etc.
+- **Code**: Source files shared in messages
+- **All File Types**: Any file attached to Slack messages
+
+### Export Format References
+
+#### Markdown with Downloaded Files
+```markdown
+**Files:** 2 file(s)
+- report.pdf
+  - Downloaded: saved_messages_attachments/general_C123/20260115_U12AB_report.pdf
+  - Original URL: https://files.slack.com/files-pri/T123/F456/report.pdf
+- image.png
+  - Downloaded: saved_messages_attachments/general_C123/20260115_U12AB_image.png
+  - Original URL: https://files.slack.com/files-pri/T123/F789/image.png
+```
+
+#### JSON with Downloaded Files
+```json
+{
+  "files": [
+    {
+      "name": "report.pdf",
+      "url_private": "https://files.slack.com/...",
+      "local_path": "./saved_messages_attachments/general_C123/20260115_U12AB_report.pdf",
+      "size": 1234567,
+      "mimetype": "application/pdf"
+    }
+  ]
+}
+```
+
+### Performance Notes
+
+- **Sequential Downloads**: Files are downloaded one at a time to respect Slack's rate limits
+- **Automatic Throttling**: ~1-2 files per second (rate-limited appropriately)
+- **Error Resilience**: Failed downloads don't stop the export process; summary shows success/failure counts
+- **Resumable**: Re-run the command with the same options to retry failed downloads
+
+### Required Scope
+
+To download attachments, your token needs the `files:read` scope in addition to the scopes required for the export operation.
+
+| Operation | Required Scopes for Downloads |
+|-----------|-------------------------------|
+| **Saved Messages** | `search:read`, `channels:read`, `users:read`, `files:read` |
+| **DMs** | `im:history`, `groups:history`, `channels:read`, `users:read`, `files:read` |
+| **Channels/Search** | `search:read`, `channels:read`, `users:read`, `files:read` |
 
 ## Output Formats
 
@@ -357,6 +481,28 @@ All tools handle rate limits automatically:
 - Ensure token starts with `xoxp-` (User OAuth Token, not Bot Token)
 - Verify token is from the correct workspace
 - Check that the app is installed in your workspace
+
+#### Attachment Download Issues
+
+**"No download URL found for file"**
+- Some older files may no longer be accessible via download URL
+- The export continues with other files (resilient processing)
+
+**"Failed to download X attachments"**
+- Check that your token has `files:read` scope
+- Verify network connectivity
+- Some files may require additional permissions
+- Files that fail are logged; rerun the export to retry
+
+**"Disk space errors"**
+- Ensure sufficient disk space for all attachments
+- Limit exports using date ranges: `-q "after:2025-01-01"`
+- Use `--max-file-size` (future feature) to skip large files
+
+**Slow downloads**
+- Sequential downloads are intentional (respects rate limits)
+- Typical speed: 1-2 files per second depending on file size
+- Large exports will take longer; consider exporting by date range
 
 ### Getting Help
 

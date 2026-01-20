@@ -11,11 +11,12 @@ import json
 import sys
 import calendar
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Iterator
+from pathlib import Path
+from typing import Dict, List, Optional, Iterator, Any
 from dataclasses import dataclass
 
 # Import our standardized utilities
-from utils import SlackExporter, format_timestamp, get_user_name, get_channel_name
+from utils import SlackExporter, format_timestamp, get_user_name, get_channel_name, sanitize_dirname
 
 
 @dataclass
@@ -27,15 +28,17 @@ class SearchConfig:
     monthly_chunks: bool = False
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    download_dir: Optional[str] = None
 
 
 class SlackPostsFetcher(SlackExporter):
     """Fetches Slack posts using search API."""
-    
-    def __init__(self, token: str):
+
+    def __init__(self, token: str, download_dir: Optional[str] = None):
         super().__init__(token, "PostsFetcher")
         self.user_cache = {}
         self.channel_cache = {}
+        self.download_dir = download_dir
     
     def search_messages(self, config: SearchConfig) -> List[Dict]:
         """Search for messages with the given configuration."""
@@ -158,36 +161,44 @@ class SlackPostsFetcher(SlackExporter):
         """Enrich messages with user and channel names."""
         if not messages:
             return messages
-        
+
         self.logger.phase(2, f"Enriching {len(messages)} messages")
-        
+
         enriched_messages = []
-        
+
         for i, msg in enumerate(messages):
             try:
                 # Get user and channel names
                 user_id = msg.get('user', '')
                 channel_id = msg.get('channel', {}).get('id', '') if isinstance(msg.get('channel'), dict) else msg.get('channel', '')
-                
+
                 user_name = get_user_name(self.user_cache, user_id, self.session) if user_id else 'Unknown User'
                 channel_name = get_channel_name(self.channel_cache, channel_id, self.session) if channel_id else 'Unknown Channel'
-                
+
                 # Create enriched message
                 enriched_msg = msg.copy()
                 enriched_msg['user_name'] = user_name
                 enriched_msg['channel_name'] = channel_name
                 enriched_msg['formatted_date'] = format_timestamp(msg.get('ts', ''))
-                
+
+                # Download files if directory specified
+                if self.download_dir and enriched_msg.get('files'):
+                    self.download_message_files(
+                        enriched_msg,
+                        self.download_dir,
+                        enriched_msg['channel_name']
+                    )
+
                 enriched_messages.append(enriched_msg)
-                
+
                 # Update progress
                 self.logger.progress(i + 1, len(messages), f"Processing message {i + 1}")
-                
+
             except Exception as e:
                 self.logger.warning(f"Error enriching message {i + 1}: {e}", indent=1)
                 enriched_messages.append(msg)  # Include original if enrichment fails
                 continue
-        
+
         self.logger.success(f"Enriched {len(enriched_messages)} messages")
         return enriched_messages
     
@@ -217,14 +228,26 @@ class SlackPostsFetcher(SlackExporter):
                 
                 f.write("\n**Message:**\n\n")
                 f.write(f"{msg.get('text', '*(No text)*')}\n\n")
-                
+
                 # Attachments
                 if msg.get('attachments'):
                     f.write(f"**Attachments:** {len(msg['attachments'])} attachment(s)\n\n")
-                
+
                 # Files
                 if msg.get('files'):
-                    f.write(f"**Files:** {len(msg['files'])} file(s)\n\n")
+                    f.write(f"**Files:** {len(msg['files'])} file(s)\n")
+                    for file_info in msg['files']:
+                        name = file_info.get('name', 'Unknown file')
+                        local_path = file_info.get('local_path')
+                        if local_path:
+                            f.write(f"- {name}\n")
+                            f.write(f"  - Downloaded: {local_path}\n")
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"  - Original URL: {url}\n")
+                        else:
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"- {name}: {url}\n")
+                    f.write("\n")
                 
                 f.write("---\n\n")
                 
@@ -346,19 +369,33 @@ Required Slack API scopes:
     parser.add_argument('-o', '--output',
                         help='Output file (.md, .json, or .jsonl)')
     parser.add_argument('--monthly-chunks', action='store_true',
-                        help='Break search into monthly chunks for complete history)') 
+                        help='Break search into monthly chunks for complete history)')
     parser.add_argument('--start-date', type=str,
                         help='Start date for monthly chunks (YYYY-MM-DD, default: 2 years ago)')
-    parser.add_argument('--end-date', type=str, 
+    parser.add_argument('--end-date', type=str,
                         help='End date for monthly chunks (YYYY-MM-DD, default: today)')
+    parser.add_argument('--download-attachments', action='store_true',
+                        help='Download attachment files to disk')
+    parser.add_argument('--attachments-dir', type=str,
+                        help='Directory for downloaded attachments (default: <output>_attachments)')
     
     args = parser.parse_args()
-    
+
     # Default output filename
     if not args.output:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         args.output = f'slack_search_{timestamp}.md'
-    
+
+    # Determine download directory
+    download_dir = None
+    if args.download_attachments:
+        if args.attachments_dir:
+            download_dir = args.attachments_dir
+        else:
+            # Default: output_name_attachments
+            base_name = Path(args.output).stem
+            download_dir = f'{base_name}_attachments'
+
     # Create search configuration
     config = SearchConfig(
         query=args.query,
@@ -366,11 +403,12 @@ Required Slack API scopes:
         page_size=min(args.page_size, 100),
         monthly_chunks=args.monthly_chunks,
         start_date=args.start_date,
-        end_date=args.end_date
+        end_date=args.end_date,
+        download_dir=download_dir
     )
-    
+
     try:
-        fetcher = SlackPostsFetcher(args.token)
+        fetcher = SlackPostsFetcher(args.token, download_dir)
         message_count, hit_limit = fetcher.search_and_export(config, args.output)
         
         if message_count > 0:

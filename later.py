@@ -14,16 +14,17 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 # Import our standardized utilities
-from utils import SlackExporter, format_timestamp, get_user_name, get_channel_name
+from utils import SlackExporter, format_timestamp, get_user_name, get_channel_name, sanitize_dirname
 
 
 class SlackLaterFetcher(SlackExporter):
     """Fetches Slack 'Save for Later' messages."""
-    
-    def __init__(self, token: str):
+
+    def __init__(self, token: str, download_dir: Optional[str] = None):
         super().__init__(token, "LaterFetcher")
         self.user_cache = {}
         self.channel_cache = {}
+        self.download_dir = download_dir
     
     def fetch_saved_messages(self, page_size: int = 100) -> List[Dict[str, Any]]:
         """Fetch all saved messages using the search API with 'is:saved' query."""
@@ -111,14 +112,22 @@ class SlackLaterFetcher(SlackExporter):
                 }
                 
                 enriched_messages.append(enriched_message)
-                
+
+                # Download files if directory specified
+                if self.download_dir and enriched_message.get('files'):
+                    self.download_message_files(
+                        enriched_message,
+                        self.download_dir,
+                        enriched_message['channel_name']
+                    )
+
                 # Update progress
                 self.logger.progress(i + 1, len(messages), f"Processing message {i + 1}")
-                
+
             except Exception as e:
                 self.logger.warning(f"Error enriching message {i + 1}: {e}", indent=1)
                 continue
-        
+
         self.logger.success(f"Enriched {len(enriched_messages)} messages")
         return enriched_messages
     
@@ -164,8 +173,15 @@ class SlackLaterFetcher(SlackExporter):
                     f.write(f"**Files:** {len(msg['files'])} file(s)\n")
                     for file_info in msg['files']:
                         name = file_info.get('name', 'Unknown file')
-                        url = file_info.get('url_private', file_info.get('permalink', ''))
-                        f.write(f"- {name}: {url}\n")
+                        local_path = file_info.get('local_path')
+                        if local_path:
+                            f.write(f"- {name}\n")
+                            f.write(f"  - Downloaded: {local_path}\n")
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"  - Original URL: {url}\n")
+                        else:
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"- {name}: {url}\n")
                     f.write("\n")
                 
                 # Blocks (rich content)
@@ -253,20 +269,34 @@ Required Slack API scopes:
     
     parser.add_argument('-t', '--token', required=True,
                         help='Slack User OAuth Token (starts with xoxp-)')
-    parser.add_argument('-o', '--output', 
+    parser.add_argument('-o', '--output',
                         help='Output file path (default: saved_messages_<timestamp>.md)')
     parser.add_argument('--page-size', type=int, default=100,
                         help='Messages per API call (default: 100)')
+    parser.add_argument('--download-attachments', action='store_true',
+                        help='Download attachment files to disk')
+    parser.add_argument('--attachments-dir', type=str,
+                        help='Directory for downloaded attachments (default: <output>_attachments)')
     
     args = parser.parse_args()
-    
+
     # Default output filename
     if not args.output:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         args.output = f'saved_messages_{timestamp}.md'
-    
+
+    # Determine download directory
+    download_dir = None
+    if args.download_attachments:
+        if args.attachments_dir:
+            download_dir = args.attachments_dir
+        else:
+            # Default: output_name_attachments
+            base_name = Path(args.output).stem
+            download_dir = f'{base_name}_attachments'
+
     try:
-        fetcher = SlackLaterFetcher(args.token)
+        fetcher = SlackLaterFetcher(args.token, download_dir)
         message_count = fetcher.fetch_and_export(args.output, args.page_size)
         
         if message_count > 0:

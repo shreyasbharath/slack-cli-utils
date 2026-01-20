@@ -8,8 +8,9 @@ for all Slack export tools.
 
 import time
 import sys
+import os
 import requests
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 class SlackLogger:
@@ -241,10 +242,82 @@ class SlackExporter:
         self.logger.info(f"📁 Output file: {output_file}")
         self.logger.info(f"📊 Total items: {total_items:,}")
         self.logger.info(f"⏱️  Export time: {export_time:.1f}s")
-        
+
         if total_items > 0:
             rate = total_items / export_time
             self.logger.info(f"🚀 Processing rate: {rate:.1f} items/sec")
+
+    def download_file(self, file_obj: Dict[str, Any], download_dir: str,
+                      channel_name: str, user_id: str, filename_counter: Dict) -> Optional[str]:
+        """
+        Download a file from Slack with authentication.
+
+        Returns local file path if successful, None otherwise.
+        """
+        url = file_obj.get('url_private_download') or file_obj.get('url_private')
+        if not url:
+            self.logger.warning("No download URL found for file", indent=2)
+            return None
+
+        # Create channel-specific subdirectory
+        channel_dir = os.path.join(download_dir, sanitize_dirname(channel_name))
+        os.makedirs(channel_dir, exist_ok=True)
+
+        # Generate safe filename
+        filename = generate_safe_filename(file_obj, user_id, filename_counter)
+        filepath = os.path.join(channel_dir, filename)
+
+        # Download with retries
+        for attempt in range(3):
+            try:
+                self.rate_limiter.throttle_request()
+                response = self.session.get(url, stream=True, timeout=60)
+                response.raise_for_status()
+
+                # Stream to disk
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                file_size = os.path.getsize(filepath)
+                self.logger.info(f"Downloaded: {filename} ({file_size:,} bytes)", indent=2)
+                return filepath
+
+            except requests.exceptions.RequestException as e:
+                if attempt < 2:
+                    self.rate_limiter.exponential_backoff(attempt)
+                else:
+                    self.logger.error(f"Failed to download {filename}: {e}", indent=2)
+                    return None
+
+        return None
+
+    def download_message_files(self, message: Dict, download_dir: str,
+                               channel_name: str) -> Dict[str, int]:
+        """
+        Download all files attached to a message.
+
+        Returns dict with download statistics.
+        """
+        files = message.get('files', [])
+        if not files:
+            return {'success': 0, 'failed': 0, 'total': 0}
+
+        user_id = message.get('user_id', message.get('user', 'unknown'))
+        filename_counter = {}
+        stats = {'success': 0, 'failed': 0, 'total': len(files)}
+
+        for file_obj in files:
+            filepath = self.download_file(file_obj, download_dir, channel_name,
+                                         user_id, filename_counter)
+            if filepath:
+                # Store local path in file object
+                file_obj['local_path'] = os.path.relpath(filepath, os.path.dirname(download_dir))
+                stats['success'] += 1
+            else:
+                stats['failed'] += 1
+
+        return stats
 
 
 def format_timestamp(ts: str) -> str:
@@ -281,7 +354,7 @@ def get_channel_name(channel_cache: Dict[str, str], channel_id: str, session: re
     """Get channel name with caching."""
     if channel_id in channel_cache:
         return channel_cache[channel_id]
-    
+
     try:
         # Try conversations.info first
         response = session.get(f'https://slack.com/api/conversations.info', params={'channel': channel_id})
@@ -295,6 +368,53 @@ def get_channel_name(channel_cache: Dict[str, str], channel_id: str, session: re
                 return name
     except Exception:
         pass
-    
+
     channel_cache[channel_id] = channel_id
     return channel_id
+
+
+def sanitize_filename(filename: str) -> str:
+    """Remove invalid filesystem characters and truncate if needed."""
+    invalid_chars = '<>:"|?*\\/\n\r'
+    for char in invalid_chars:
+        filename = filename.replace(char, '_')
+    # Truncate to 200 chars (reserve space for prefix)
+    if len(filename) > 200:
+        base, ext = os.path.splitext(filename)
+        filename = base[:200-len(ext)] + ext
+    return filename
+
+
+def sanitize_dirname(channel_name: str) -> str:
+    """Create safe directory name from channel."""
+    clean_name = channel_name.lstrip('#')
+    clean_name = sanitize_filename(clean_name)
+    return clean_name[:100]
+
+
+def generate_safe_filename(file_obj: Dict, user_id: str, counter: Dict) -> str:
+    """Generate unique filename with collision handling."""
+    timestamp = file_obj.get('timestamp', file_obj.get('created', ''))
+    try:
+        date = datetime.fromtimestamp(float(timestamp)).strftime('%Y%m%d')
+    except (ValueError, TypeError):
+        date = datetime.now().strftime('%Y%m%d')
+
+    user_short = user_id[:8] if user_id else 'unknown'
+    original_name = sanitize_filename(file_obj.get('name', 'file'))
+
+    # Create base filename
+    base_name, ext = os.path.splitext(original_name)
+    base = f"{date}_{user_short}_{base_name}"
+
+    # Handle duplicates
+    key = f"{base}{ext}"
+    count = counter.get(key, 0)
+
+    if count > 0:
+        filename = f"{base}_{count}{ext}"
+    else:
+        filename = f"{base}{ext}"
+
+    counter[key] = count + 1
+    return filename

@@ -6,17 +6,19 @@ Fetch Slack DM history using conversations.history API with standardized logging
 import argparse
 import sys
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 
 # Import our standardized utilities
-from utils import SlackExporter, format_timestamp
+from utils import SlackExporter, format_timestamp, sanitize_dirname
 
 
 class SlackDMFetcher(SlackExporter):
     """Fetches DM conversation history from Slack."""
-    
-    def __init__(self, token: str):
+
+    def __init__(self, token: str, download_dir: Optional[str] = None):
         super().__init__(token, "DMFetcher")
+        self.download_dir = download_dir
         
     def fetch_and_export(self, channel_id: str, output_file: str, since_date: str = "2025-01-01") -> int:
         """Fetch and save messages incrementally with progress tracking"""
@@ -41,9 +43,9 @@ class SlackDMFetcher(SlackExporter):
         
         total_count = len(all_messages)
         self.logger.success(f"Found {total_count:,} messages to process")
-        
+
         # Write messages to file with progress tracking
-        self._write_messages_to_file(all_messages, channel_id, since_date, output_file)
+        self._write_messages_to_file(all_messages, channel_id, since_date, output_file, self.download_dir)
         
         # Summary
         export_time = (datetime.now() - start_time).total_seconds()
@@ -98,10 +100,14 @@ class SlackDMFetcher(SlackExporter):
         
         return all_messages
     
-    def _write_messages_to_file(self, messages: List[Dict[str, Any]], channel_id: str, since_date: str, output_file: str):
+    def _write_messages_to_file(self, messages: List[Dict[str, Any]], channel_id: str, since_date: str, output_file: str, download_dir: Optional[str] = None):
         """Write messages to file with progress tracking"""
-        
-        self.logger.phase(2, f"Writing {len(messages):,} messages to file")
+
+        # Download files if directory specified
+        if download_dir:
+            self.logger.phase(2, f"Downloading and writing {len(messages):,} messages to file")
+        else:
+            self.logger.phase(2, f"Writing {len(messages):,} messages to file")
         
         with open(output_file, 'w', encoding='utf-8') as f:
             # Write header
@@ -130,11 +136,22 @@ class SlackDMFetcher(SlackExporter):
                 # Files and attachments
                 files = message.get('files', [])
                 if files:
+                    # Download files if directory specified
+                    if download_dir:
+                        self.download_message_files(message, download_dir, "dm")
+
                     f.write(f"**Files:** {len(files)} file(s)\n")
                     for file_info in files:
                         name = file_info.get('name', 'Unknown file')
-                        url = file_info.get('url_private', file_info.get('permalink', ''))
-                        f.write(f"- {name}: {url}\n")
+                        local_path = file_info.get('local_path')
+                        if local_path:
+                            f.write(f"- {name}\n")
+                            f.write(f"  - Downloaded: {local_path}\n")
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"  - Original URL: {url}\n")
+                        else:
+                            url = file_info.get('url_private', file_info.get('permalink', ''))
+                            f.write(f"- {name}: {url}\n")
                     f.write("\n")
                 
                 attachments = message.get('attachments', [])
@@ -196,16 +213,30 @@ Required Slack API scopes:
                         help='Start date in YYYY-MM-DD format (default: 2025-01-01)')
     parser.add_argument('-o', '--output',
                         help='Output file path (default: dm_<channel>_<timestamp>.md)')
+    parser.add_argument('--download-attachments', action='store_true',
+                        help='Download attachment files to disk')
+    parser.add_argument('--attachments-dir', type=str,
+                        help='Directory for downloaded attachments (default: <output>_attachments)')
     
     args = parser.parse_args()
-    
+
     # Default output filename
     if not args.output:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         args.output = f'dm_{args.channel}_{timestamp}.md'
-    
+
+    # Determine download directory
+    download_dir = None
+    if args.download_attachments:
+        if args.attachments_dir:
+            download_dir = args.attachments_dir
+        else:
+            # Default: output_name_attachments
+            base_name = Path(args.output).stem
+            download_dir = f'{base_name}_attachments'
+
     try:
-        fetcher = SlackDMFetcher(args.token)
+        fetcher = SlackDMFetcher(args.token, download_dir)
         message_count = fetcher.fetch_and_export(args.channel, args.output, args.since)
         
         if message_count > 0:

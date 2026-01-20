@@ -166,6 +166,24 @@ class InteractivePrompts:
         response = input("\nUse monthly chunks for complete history? (y/N): ").strip().lower()
         return response == 'y'
 
+    @staticmethod
+    def get_download_attachments() -> bool:
+        """Ask if user wants to download attachments."""
+        print("\n📎 Attachment Download Options")
+        response = input("Download attachments to local disk? (y/N): ").strip().lower()
+        return response in ['y', 'yes']
+
+    @staticmethod
+    def get_attachments_dir(output_file: str) -> str:
+        """Get attachment directory path."""
+        base_name = os.path.splitext(output_file)[0]
+        default_dir = f"{base_name}_attachments"
+
+        print(f"Attachments directory (default: {default_dir}): ", end='')
+        custom_dir = input().strip()
+
+        return custom_dir if custom_dir else default_dir
+
 
 class MenuDisplay:
     """Handles menu display and user choice selection."""
@@ -335,12 +353,17 @@ class OperationHandler:
         """Run bookmarks export interactively."""
         token = self.prompts.get_token()
         output = self.prompts.get_output_filename('bookmarks')
-        
+
         self.cmd_builder.add_common_params(cmd, token, output)
-        
+
         page_size = self.prompts.get_page_size()
         self.cmd_builder.add_optional_param(cmd, '--page-size', page_size)
-        
+
+        # Ask about downloading attachments
+        if self.prompts.get_download_attachments():
+            attachments_dir = self.prompts.get_attachments_dir(output)
+            cmd.extend(['--download-attachments', '--attachments-dir', attachments_dir])
+
         return self.execute_command(cmd)
     
     def _run_later_direct(self, cmd: List[str], args) -> int:
@@ -372,9 +395,14 @@ class OperationHandler:
         channel = self.prompts.get_channel_id()
         output = self.prompts.get_output_filename('dm')
         since = self.prompts.get_date_range()
-        
+
         cmd.extend(['-t', token, '-c', channel, '-o', output, '-s', since])
-        
+
+        # Ask about downloading attachments
+        if self.prompts.get_download_attachments():
+            attachments_dir = self.prompts.get_attachments_dir(output)
+            cmd.extend(['--download-attachments', '--attachments-dir', attachments_dir])
+
         return self.execute_command(cmd)
     
     def _run_dm_direct(self, cmd: List[str], args) -> int:
@@ -426,7 +454,12 @@ class OperationHandler:
         self.cmd_builder.add_common_params(cmd, token, output)
         cmd.extend(['-q', query])
         self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
-        
+
+        # Ask about downloading attachments
+        if self.prompts.get_download_attachments():
+            attachments_dir = self.prompts.get_attachments_dir(output)
+            cmd.extend(['--download-attachments', '--attachments-dir', attachments_dir])
+
         # Use special executor that checks for limit if not already using chunks
         if not use_chunks:
             return self.execute_with_limit_check(cmd, token, query, output)
@@ -476,17 +509,22 @@ class OperationHandler:
             query = f"{base_query} {time_filter}".strip()
         
         output = self.prompts.get_output_filename('search')
-        
+
         self.cmd_builder.add_common_params(cmd, token, output)
         cmd.extend(['-q', query])
-        
+
         # Only ask for max results if not using monthly chunks
         if not use_chunks:
             max_results = self.prompts.get_max_results()
             self.cmd_builder.add_optional_param(cmd, '-m', max_results)
-        
+
         self.cmd_builder.add_flag_if_true(cmd, '--monthly-chunks', use_chunks)
-        
+
+        # Ask about downloading attachments
+        if self.prompts.get_download_attachments():
+            attachments_dir = self.prompts.get_attachments_dir(output)
+            cmd.extend(['--download-attachments', '--attachments-dir', attachments_dir])
+
         return self.execute_command(cmd)
     
     def _run_search_direct(self, cmd: List[str], args) -> int:
